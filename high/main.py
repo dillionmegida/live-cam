@@ -82,8 +82,6 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-# Load NoIR tuning file
-tuning = Picamera2.load_tuning_file("/usr/share/libcamera/ipa/rpi/vc4/imx708_noir.json")
 picam2 = Picamera2()
 
 # Configure resolution
