@@ -4,6 +4,7 @@ from picamera2.encoders import JpegEncoder
 from picamera2.outputs import FileOutput
 
 from .streaming import StreamingOutput, start_stream_thread
+from .recorder import VideoRecorder
 from .handlers import make_handler
 from .server import StreamingServer
 
@@ -31,6 +32,10 @@ def main(host: str = '', port: int = 5000, width: int = 800, height: int = 450, 
     picam2.start()
     start_stream_thread(picam2, output, fps)
 
+    # Start H264 segment recorder explicitly (since write() isn't used for triggering anymore)
+    recorder = VideoRecorder(picam2, segment_seconds=60)
+    recorder.start_recording()
+
     try:
         address = (host, port)
         handler_cls = make_handler(output)
@@ -41,11 +46,14 @@ def main(host: str = '', port: int = 5000, width: int = 800, height: int = 450, 
     except KeyboardInterrupt:
         print("\nShutting down server...")
     finally:
-        if hasattr(output, 'video_recorder') and output.video_recorder:
-            output.video_recorder.stop_recording()
+        # Stop recorder cleanly
+        try:
+            recorder.stop_recording()
+        except Exception:
+            pass
         picam2.stop()
         print("Server stopped.")
 
 
 if __name__ == "__main__":
-    main()
+    main(host='0.0.0.0', port=5000)
