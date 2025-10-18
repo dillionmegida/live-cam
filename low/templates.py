@@ -32,16 +32,9 @@ PAGE_INDEX = """
       grid-template-areas: "video" "stats";
       grid-template-columns: 1fr;
       gap: 16px;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 16px;
     }
     .video-section {
       grid-area: video;
-      background: white;
-      border-radius: 10px;
-      padding: 15px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
     .stats-section {
       grid-area: stats;
@@ -49,6 +42,8 @@ PAGE_INDEX = """
       border-radius: 10px;
       padding: 15px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-width: 1200px;
+      margin: 0 auto;
     }
     .stats-grid {
       display: grid;
