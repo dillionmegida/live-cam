@@ -8,6 +8,7 @@ import numpy as np
 from picamera2 import Picamera2
 from picamera2.encoders import H264Encoder, JpegEncoder
 from picamera2.outputs import FileOutput
+from datetime import datetime
 
 PAGE = """
 <html>
@@ -31,11 +32,30 @@ class StreamingOutput(io.BufferedIOBase):
         nparr = np.frombuffer(buf, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if img is not None:
+            # Get current time and format it
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Add timestamp to the image
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.7
+            font_color = (255, 255, 255)  # White text
+            font_thickness = 2
+            
+            # Get text size to create a background rectangle
+            (text_width, text_height), _ = cv2.getTextSize(timestamp, font, font_scale, font_thickness)
+            
+            # Add semi-transparent background for better text visibility
+            overlay = img.copy()
+            cv2.rectangle(overlay, (10, 10), (20 + text_width, 20 + text_height), (0, 0, 0), -1)
+            alpha = 0.6  # Transparency factor
+            cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
+            
+            # Add timestamp text
+            cv2.putText(img, timestamp, (15, 30), font, font_scale, font_color, font_thickness, cv2.LINE_AA)
 
-        # Convert grayscale image back to JPEG buffer
-        ret, jpeg = cv2.imencode('.jpg', gray)
+        # Convert image back to JPEG buffer
+        ret, jpeg = cv2.imencode('.jpg', img)
         if ret:
             with self.condition:
                 self.frame = jpeg.tobytes()
@@ -85,20 +105,23 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 picam2 = Picamera2()
 
 # Configure resolution
-height = 400
+height = 450
 ratio = 16 / 9
 width = int(ratio * height)
-picam2.configure(picam2.create_video_configuration(main={'size': (width, height)}))
+picam2.configure(picam2.create_video_configuration(
+  main={'size': (width, height), 'format': 'YUV420'})
+)
 
 # Set manual White Balance off and custom gains (adjust gains if needed)
 picam2.set_controls({
     "AwbMode": 0,
-    "ColourGains": (1.0, 1.0)
+    "ColourGains": (1.0, 1.0),
+    "FrameRate": 10
 })
 
 output = StreamingOutput()
 
-picam2.start_recording(JpegEncoder(), FileOutput(output))
+picam2.start_recording(JpegEncoder(q=70), FileOutput(output))
 
 try:
     address = ('', 5000)
