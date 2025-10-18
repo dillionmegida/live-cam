@@ -30,14 +30,12 @@ PAGE_INDEX = """
     }
     .container {
       display: grid;
-      grid-template-areas: 
-        "video stats"
-        "controls actions";
-      grid-template-columns: 2fr 1fr;
-      gap: 20px;
+      grid-template-areas: "video" "stats";
+      grid-template-columns: 1fr;
+      gap: 16px;
       max-width: 1200px;
-      margin: 20px auto;
-      padding: 20px;
+      margin: 0 auto;
+      padding: 16px;
     }
     .video-section {
       grid-area: video;
@@ -133,32 +131,14 @@ PAGE_INDEX = """
 <body>
   <div class="container">
     <div class="video-section">
-      <h2>Live Camera Feed</h2>
       <img src="stream.mjpg" />
     </div>
     
     <div class="stats-section">
-      <h2>System Status</h2>
       <div class="stats-grid">
         <div class="stat-item">
           <div class="stat-label">CPU Usage</div>
           <div class="stat-value" id="cpu">--%</div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="--width: 0%"></div>
-          </div>
-        </div>
-        
-        <div class="stat-item">
-          <div class="stat-label">CPU Temperature</div>
-          <div class="stat-value" id="temp">--°C</div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="--width: 0%"></div>
-          </div>
-        </div>
-        
-        <div class="stat-item">
-          <div class="stat-label">Memory Usage</div>
-          <div class="stat-value" id="memory">--%</div>
           <div class="progress-bar">
             <div class="progress-fill" style="--width: 0%"></div>
           </div>
@@ -172,11 +152,6 @@ PAGE_INDEX = """
           </div>
         </div>
       </div>
-    </div>
-    
-    <div class="actions-section">
-      <h2>Actions</h2>
-      <a href="/recordings" class="action-button">View Recordings</a>
     </div>
   </div>
 </body>

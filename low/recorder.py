@@ -9,12 +9,13 @@ from .config import RECORDINGS_DIR
 
 
 class VideoRecorder:
-    def __init__(self, picam2):
+    def __init__(self, picam2, segment_seconds: int = 60):
         self.picam2 = picam2
         self.recording = False
         self.output_dir = RECORDINGS_DIR
         os.makedirs(self.output_dir, exist_ok=True)
         self.recording_thread = None
+        self.segment_seconds = int(segment_seconds)
 
     def start_recording(self):
         if not self.recording:
@@ -30,7 +31,7 @@ class VideoRecorder:
             encoder = H264Encoder()
             output = FfmpegOutput(output_file)
             self.picam2.start_recording(encoder, output, pts=f"{output_file}.pts")
-            time.sleep(10)
+            time.sleep(self.segment_seconds)
             self.picam2.stop_recording()
             if os.path.exists(f"{output_file}.pts"):
                 os.remove(f"{output_file}.pts")
