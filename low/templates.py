@@ -52,7 +52,7 @@ PAGE_INDEX = """
     }
     .stats-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 15px;
     }
     .stat-item {
@@ -121,6 +121,9 @@ PAGE_INDEX = """
         grid-template-areas: "video" "stats" "actions";
         grid-template-columns: 1fr;
       }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -146,6 +149,11 @@ PAGE_INDEX = """
           <div class="progress-bar">
             <div class="progress-fill" id="storage-progress" style="width: 0%"></div>
           </div>
+        </div>
+
+        <div class="stat-item">
+          <div class="stat-label">Recordings</div>
+          <a href="/recordings" style="display:inline-block; font-weight:bold; color:#0d6efd; text-decoration:none;">View recordings →</a>
         </div>
       </div>
     </div>
