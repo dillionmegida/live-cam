@@ -8,13 +8,12 @@ PAGE_INDEX = """
         .then(response => response.json())
         .then(data => {
           document.getElementById('cpu').textContent = data.cpu + '%';
-          document.getElementById('temp').textContent = data.temp + '°C';
-          document.getElementById('storage').textContent = data.storage;
-          document.getElementById('memory').textContent = data.memory + '%';
-          // Update progress bars
-          document.querySelector('#cpu + .progress-bar .progress-fill').style.width = data.cpu + '%';
-          document.querySelector('#memory + .progress-bar .progress-fill').style.width = data.memory + '%';
-          document.querySelector('#storage + .progress-bar .progress-fill').style.width = (data.storage_percent || 0) + '%';
+          document.getElementById('storage').textContent = data.storage || (data.storage_percent + '%');
+          // Update progress bars via explicit IDs for robustness
+          const cpuProg = document.getElementById('cpu-progress');
+          const storageProg = document.getElementById('storage-progress');
+          if (cpuProg) cpuProg.style.width = (data.cpu || 0) + '%';
+          if (storageProg) storageProg.style.width = (data.storage_percent || 0) + '%';
         })
         .catch(err => console.log('Error fetching system info:', err));
     }
@@ -59,11 +58,8 @@ PAGE_INDEX = """
     .stat-item {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 15px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border: 1px solid #e9ecef;
+      gap: 6px;
+      padding: 8px 0;
     }
     .stat-label {
       font-size: 14px;
@@ -140,7 +136,7 @@ PAGE_INDEX = """
           <div class="stat-label">CPU Usage</div>
           <div class="stat-value" id="cpu">--%</div>
           <div class="progress-bar">
-            <div class="progress-fill" style="--width: 0%"></div>
+            <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
           </div>
         </div>
         
@@ -148,7 +144,7 @@ PAGE_INDEX = """
           <div class="stat-label">Storage Used</div>
           <div class="stat-value" id="storage">--</div>
           <div class="progress-bar">
-            <div class="progress-fill" style="--width: 0%"></div>
+            <div class="progress-fill" id="storage-progress" style="width: 0%"></div>
           </div>
         </div>
       </div>
