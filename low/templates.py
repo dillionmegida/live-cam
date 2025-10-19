@@ -2,6 +2,8 @@ PAGE_INDEX = """
 <html>
 <head>
   <title>Live Cam</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>
     function updateSystemInfo() {
       fetch('/system.json')
@@ -169,6 +171,8 @@ PAGE_RECORDINGS = """
 <html>
 <head>
   <title>Recordings</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>
     function loadRecordings() {
       fetch('/api/recordings')
