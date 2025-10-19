@@ -25,6 +25,7 @@ def main(host: str = '', port: int = 5000, width: int = 800, height: int = 450, 
         "AwbMode": 0,
         "ColourGains": (1.0, 1.0),
         "FrameRate": fps,
+        "Saturation": 0.0,
     })
 
     # Start camera and stream thread (no JPEG encoder) to avoid conflicts with H264 recordings

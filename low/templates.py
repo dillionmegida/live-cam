@@ -197,10 +197,6 @@ PAGE_RECORDINGS = """
           document.getElementById('recordings-container').innerHTML = '<p>Error loading recordings.</p>';
         });
     }
-    
-    // Refresh every 30 seconds
-    setInterval(loadRecordings, 30000);
-    window.onload = loadRecordings;
   </script>
   <style>
     * { margin:0; padding:0; }
@@ -227,6 +223,20 @@ PAGE_RECORDINGS = """
     }
     .header .back-link:hover {
       text-decoration: underline;
+    }
+    .refresh-btn {
+      display: inline-block;
+      margin-left: 12px;
+      padding: 8px 14px;
+      background: #0d6efd;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .refresh-btn:hover {
+      background: #0b5ed7;
     }
     .container {
       max-width: 1200px;
@@ -292,10 +302,11 @@ PAGE_RECORDINGS = """
   <div class="header">
     <h1>Video Recordings</h1>
     <a href="/" class="back-link">← Back to Live Feed</a>
+    <button class="refresh-btn" onclick="loadRecordings()">Refresh</button>
   </div>
   <div class="container">
     <div id="recordings-container">
-      <p>Loading recordings...</p>
+      <p>Click Refresh to load recordings.</p>
     </div>
   </div>
 </body>
