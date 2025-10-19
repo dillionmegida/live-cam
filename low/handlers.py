@@ -98,21 +98,48 @@ def make_handler(output):
                 self.end_headers()
                 self.wfile.write(content)
             elif self.path.startswith('/api/recordings'):
-                # Return list of recordings
+                # Return list of recordings (flat) and also grouped by hourly windows per date
                 videos = []
                 for filename in os.listdir(RECORDINGS_DIR):
                     if filename.endswith('.mp4'):
                         filepath = os.path.join(RECORDINGS_DIR, filename)
                         stat = os.stat(filepath)
+                        dt = datetime.fromtimestamp(stat.st_mtime)
                         videos.append({
                             'name': filename,
                             'size': f"{stat.st_size / (1024*1024):.1f} MB",
-                            'date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                            'date': dt.strftime('%Y-%m-%d %H:%M:%S'),
                         })
                 # Sort by date, newest first
                 videos.sort(key=lambda x: x['date'], reverse=True)
-                
-                content = json.dumps({'videos': videos}).encode('utf-8')
+
+                # Group per date-hour window (e.g., 13:00–14:00 on 2025-10-19)
+                from collections import defaultdict
+                grouped = defaultdict(list)
+                for v in videos:
+                    dt = datetime.strptime(v['date'], '%Y-%m-%d %H:%M:%S')
+                    start_label = dt.strftime('%Y-%m-%d, %I %p')  # e.g., 2025-10-19, 01 PM
+                    end_hour = (dt.hour + 1) % 24
+                    # Build end label using same date or next day; for label purposes just show hour
+                    end_label = datetime(dt.year, dt.month, dt.day, end_hour).strftime('%I %p')
+                    label = f"{start_label} – {end_label}"
+                    grouped[label].append(v)
+
+                # Order groups by latest datetime descending
+                def group_sort_key(label: str):
+                    # label like 'YYYY-MM-DD, HH AM/PM – HH AM/PM'
+                    base = label.split('–')[0].strip()  # 'YYYY-MM-DD, HH AM/PM'
+                    return datetime.strptime(base, '%Y-%m-%d, %I %p')
+
+                groups = [
+                    {
+                        'label': label,
+                        'videos': sorted(items, key=lambda x: x['date'], reverse=True)
+                    }
+                    for label, items in sorted(grouped.items(), key=lambda kv: group_sort_key(kv[0]), reverse=True)
+                ]
+
+                content = json.dumps({'videos': videos, 'groups': groups}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Cache-Control', 'no-cache')
