@@ -9,6 +9,9 @@ PAGE_INDEX = """
         .then(data => {
           document.getElementById('cpu').textContent = data.cpu + '%';
           document.getElementById('storage').textContent = data.storage || (data.storage_percent + '%');
+          if (data.uptime_human && document.getElementById('uptime')) {
+            document.getElementById('uptime').textContent = `Uptime: ${data.uptime_human}`;
+          }
           // Update progress bars via explicit IDs for robustness
           const cpuProg = document.getElementById('cpu-progress');
           const storageProg = document.getElementById('storage-progress');
@@ -65,6 +68,10 @@ PAGE_INDEX = """
       font-size: 24px;
       font-weight: bold;
       color: #212529;
+    }
+    .uptime-note {
+      font-size: 12px;
+      color: #6c757d;
     }
     .progress-bar {
       width: 100%;
@@ -144,6 +151,7 @@ PAGE_INDEX = """
           <div class="progress-bar">
             <div class="progress-fill" id="storage-progress" style="width: 0%"></div>
           </div>
+          <div class="uptime-note" id="uptime">Uptime: --</div>
         </div>
 
         <div class="stat-item">
@@ -197,6 +205,8 @@ PAGE_RECORDINGS = """
           document.getElementById('recordings-container').innerHTML = '<p>Error loading recordings.</p>';
         });
     }
+    
+    window.onload = loadRecordings;
   </script>
   <style>
     * { margin:0; padding:0; }

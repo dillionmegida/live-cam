@@ -1,6 +1,7 @@
 import logging
 import os
 import json
+import time
 import subprocess
 from datetime import datetime
 from http import server
@@ -72,12 +73,22 @@ def make_handler(output):
                 except Exception:
                     cpu_temp = 0.0
 
+                # Uptime
+                boot_time = psutil.boot_time()
+                uptime_seconds = int(time.time() - boot_time)
+                days = uptime_seconds // 86400
+                hours = (uptime_seconds % 86400) // 3600
+                minutes = (uptime_seconds % 3600) // 60
+                uptime_human = f"{days}d {hours}h {minutes}m" if days else (f"{hours}h {minutes}m" if hours else f"{minutes}m")
+
                 system_info = {
                     'cpu': round(cpu_usage, 1),
                     'temp': round(cpu_temp, 1),
                     'memory': round(memory_percent, 1),
                     'storage': disk_text,
-                    'storage_percent': round(disk_usage_percent, 1)
+                    'storage_percent': round(disk_usage_percent, 1),
+                    'uptime_seconds': uptime_seconds,
+                    'uptime_human': uptime_human,
                 }
                 
                 content = json.dumps(system_info).encode('utf-8')
