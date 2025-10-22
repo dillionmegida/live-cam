@@ -1,28 +1,29 @@
-import io
-from threading import Condition
-from datetime import datetime
-import numpy as np
-import cv2
+import io  # BufferedIOBase parent for a simple output buffer
+from threading import Condition, Thread  # Notify waiting clients; daemon stream thread
+from datetime import datetime  # Timestamp overlay on frames
+import numpy as np  # Byte buffer → ndarray for OpenCV decode
+import cv2  # Image processing and JPEG encoding
 
-from .recorder import VideoRecorder
-from threading import Thread
-import time
+import time  # FPS pacing
+
+from .recorder import VideoRecorder  # Background segmented video recording
 
 
 class StreamingOutput(io.BufferedIOBase):
     def __init__(self, picam2):
-        self.frame = None
-        self.condition = Condition()
-        self.video_recorder = None
-        self.picam2 = picam2
+        self.frame = None  # Latest JPEG bytes published to clients
+        self.condition = Condition()  # Signals when a new frame is available
+        self.video_recorder = None  # Lazy-created recorder bound to picam2
+        self.picam2 = picam2  # Shared camera instance
 
     def write(self, buf):
-        # Try to process frame, but always have a safe fallback to original JPEG bytes
+        # Attempt to decode buffer → BGR image for overlay; fallback to raw bytes
         frame_bytes = None
         nparr = np.frombuffer(buf, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if img is not None:
+            # Draw timestamp with semi-transparent background for readability
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 0.7
@@ -35,7 +36,7 @@ class StreamingOutput(io.BufferedIOBase):
             cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
             cv2.putText(img, timestamp, (15, 30), font, font_scale, font_color, font_thickness, cv2.LINE_AA)
 
-            ret, jpeg = cv2.imencode('.jpg', img)
+            ret, jpeg = cv2.imencode('.jpg', img)  # Encode annotated frame to JPEG
             if ret:
                 frame_bytes = jpeg.tobytes()
 
@@ -49,24 +50,24 @@ class StreamingOutput(io.BufferedIOBase):
             self.video_recorder.start_recording()
 
         with self.condition:
-            self.frame = frame_bytes
-            self.condition.notify_all()
+            self.frame = frame_bytes  # Publish for MJPEG clients
+            self.condition.notify_all()  # Wake any waiting consumers
 
 
 def _stream_loop(picam2, output: StreamingOutput, fps: int = 10):
-    interval = max(0.001, 1.0 / max(1, fps))
+    interval = max(0.001, 1.0 / max(1, fps))  # FPS → sleep interval (clamped)
     while True:
         # Capture frame as RGB array, convert to BGR for OpenCV drawing
         frame = picam2.capture_array("main")
         if frame is None:
             continue
         if len(frame.shape) == 3 and frame.shape[2] == 3:
-            bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # RGB → BGR
         else:
             # Fallback: attempt direct use
             bgr = frame
 
-        # Timestamp overlay
+        # Timestamp overlay (same style as write())
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.7
@@ -83,13 +84,13 @@ def _stream_loop(picam2, output: StreamingOutput, fps: int = 10):
         ret, jpeg = cv2.imencode('.jpg', bgr)
         if ret:
             with output.condition:
-                output.frame = jpeg.tobytes()
-                output.condition.notify_all()
+                output.frame = jpeg.tobytes()  # Latest frame bytes
+                output.condition.notify_all()  # Notify listeners
         # Sleep to control FPS
         time.sleep(interval)
 
 
 def start_stream_thread(picam2, output: StreamingOutput, fps: int = 10) -> Thread:
-    t = Thread(target=_stream_loop, args=(picam2, output, fps), daemon=True)
+    t = Thread(target=_stream_loop, args=(picam2, output, fps), daemon=True)  # Fire-and-forget daemon
     t.start()
     return t
