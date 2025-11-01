@@ -98,48 +98,48 @@ def make_handler(output):  # Factory to bind the shared StreamingOutput to the h
                 self.end_headers()
                 self.wfile.write(content)
             elif self.path.startswith('/api/recordings'):
-                # Return list of recordings (flat) and grouped by hourly windows per date
-                videos = []  # Accumulate file metadata
+                # Parse query parameters
+                from urllib.parse import parse_qs, urlparse
+                query = parse_qs(urlparse(self.path).query)
+                page = int(query.get('page', ['1'])[0]) - 1  # 0-based index
+                per_page = 20
+                
+                # Get all video files with their metadata
+                all_videos = []
                 for filename in os.listdir(RECORDINGS_DIR):
                     if filename.endswith('.mp4'):
-                        filepath = os.path.join(RECORDINGS_DIR, filename)  # Absolute file path
-                        stat = os.stat(filepath)  # File stats (size, mtime)
-                        dt = datetime.fromtimestamp(stat.st_mtime)  # Modification time → datetime
-                        videos.append({
+                        filepath = os.path.join(RECORDINGS_DIR, filename)
+                        stat = os.stat(filepath)
+                        dt = datetime.fromtimestamp(stat.st_mtime)
+                        all_videos.append({
                             'name': filename,
-                            'size': f"{stat.st_size / (1024*1024):.1f} MB",  # Human-readable size
-                            'date': dt.strftime('%Y-%m-%d %H:%M:%S'),  # String date for UI and sorting
+                            'size': f"{stat.st_size / (1024*1024):.1f} MB",
+                            'date': dt.strftime('%Y-%m-%d %H:%M:%S'),
+                            'timestamp': dt.timestamp()  # For consistent sorting
                         })
-                # Sort by date, newest first
-                videos.sort(key=lambda x: x['date'], reverse=True)
-
-                # Group per date-hour window (e.g., 13:00–14:00 on 2025-10-19)
-                from collections import defaultdict  # Local import to keep top-level clean
-                grouped = defaultdict(list)  # label → list of videos
-                for v in videos:
-                    dt = datetime.strptime(v['date'], '%Y-%m-%d %H:%M:%S')  # Parse back to datetime
-                    start_label = dt.strftime('%Y-%m-%d, %I %p')  # Hour window start, 12h clock
-                    end_hour = (dt.hour + 1) % 24
-                    # Build end label using same date; label only needs end hour text
-                    end_label = datetime(dt.year, dt.month, dt.day, end_hour).strftime('%I %p')
-                    label = f"{start_label} - {end_label}"  # e.g., 2025-10-19, 01 PM – 02 PM
-                    grouped[label].append(v)
-
-                # Order groups by latest datetime descending
-                def group_sort_key(label: str):
-                    # Extract the start window part: 'YYYY-MM-DD, HH AM/PM'
-                    base = label.split('-')[0].strip()
-                    return datetime.strptime(base, '%Y-%m-%d, %I %p')
-
-                groups = [
-                    {
-                        'label': label,  # Hourly window label
-                        'videos': sorted(items, key=lambda x: x['date'], reverse=True)  # Newest first
+                
+                # Sort by timestamp (newest first) and paginate
+                all_videos.sort(key=lambda x: x['timestamp'], reverse=True)
+                start_idx = page * per_page
+                end_idx = start_idx + per_page
+                paginated_videos = all_videos[start_idx:end_idx]
+                
+                # Remove timestamp before sending response
+                for video in paginated_videos:
+                    video.pop('timestamp', None)
+                
+                total_videos = len(all_videos)
+                total_pages = (total_videos + per_page - 1) // per_page  # Ceiling division
+                
+                content = json.dumps({
+                    'videos': paginated_videos,
+                    'pagination': {
+                        'current_page': page + 1,
+                        'total_pages': total_pages,
+                        'total_videos': total_videos,
+                        'per_page': per_page
                     }
-                    for label, items in sorted(grouped.items(), key=lambda kv: group_sort_key(kv[0]), reverse=True)
-                ]
-
-                content = json.dumps({'videos': videos, 'groups': groups}).encode('utf-8')  # Combined payload
+                }).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Cache-Control', 'no-cache')

@@ -174,11 +174,61 @@ PAGE_RECORDINGS = """
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>
+    let currentPage = 1;
+    let totalPages = 1;
+    const perPage = 20;
+
+    function updatePaginationUI() {
+      const paginationContainer = document.getElementById('pagination');
+      if (!paginationContainer) return;
+
+      paginationContainer.innerHTML = '';
+      
+      if (totalPages <= 1) return;
+
+      // Previous button
+      const prevBtn = document.createElement('button');
+      prevBtn.textContent = 'Previous';
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.onclick = () => changePage(currentPage - 1);
+      paginationContainer.appendChild(prevBtn);
+
+      // Page numbers
+      const pageInfo = document.createElement('span');
+      pageInfo.className = 'page-info';
+      pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+      paginationContainer.appendChild(pageInfo);
+
+      // Next button
+      const nextBtn = document.createElement('button');
+      nextBtn.textContent = 'Next';
+      nextBtn.disabled = currentPage >= totalPages;
+      nextBtn.onclick = () => changePage(currentPage + 1);
+      paginationContainer.appendChild(nextBtn);
+
+      // Refresh button
+      const refreshBtn = document.createElement('button');
+      refreshBtn.innerHTML = '&#x21bb;';
+      refreshBtn.title = 'Refresh';
+      refreshBtn.className = 'refresh-page-btn';
+      refreshBtn.onclick = () => loadRecordings();
+      paginationContainer.appendChild(refreshBtn);
+    }
+
+    function changePage(page) {
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      loadRecordings();
+      window.scrollTo(0, 0);
+    }
+
     function loadRecordings() {
-      fetch('/api/recordings')
+      const container = document.getElementById('recordings-container');
+      container.innerHTML = '<p>Loading recordings...</p>';
+      
+      fetch(`/api/recordings?page=${currentPage}`)
         .then(response => response.json())
         .then(data => {
-          const container = document.getElementById('recordings-container');
           container.innerHTML = '';
           
           if (data.videos.length === 0) {
@@ -203,10 +253,17 @@ PAGE_RECORDINGS = """
             `;
             container.appendChild(videoDiv);
           });
+
+          // Update pagination state
+          if (data.pagination) {
+            totalPages = data.pagination.total_pages;
+            currentPage = data.pagination.current_page;
+            updatePaginationUI();
+          }
         })
         .catch(err => {
           console.error('Error loading recordings:', err);
-          document.getElementById('recordings-container').innerHTML = '<p>Error loading recordings.</p>';
+          container.innerHTML = '<p>Error loading recordings. Please try again.</p>';
         });
     }
     
@@ -262,12 +319,54 @@ PAGE_RECORDINGS = """
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 20px;
     }
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    .pagination button {
+      padding: 5px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .pagination button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    .pagination .refresh-page-btn {
+      margin-left: 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 15px;
+      cursor: pointer;
+      font-size: 1.1em;
+    }
+
+    .pagination .refresh-page-btn:hover {
+      background-color: #45a049;
+    }
+
+    .page-info {
+      margin: 0 15px;
+      font-weight: bold;
+    }
+
     .video-item {
       background: white;
-      border-radius: 10px;
-      padding: 20px;
+      border-radius: 8px;
+      padding: 15px;
       margin-bottom: 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       display: grid;
       grid-template-areas: "info download" "video video";
       grid-template-columns: 3fr 1fr;
@@ -319,9 +418,10 @@ PAGE_RECORDINGS = """
     <button class="refresh-btn" onclick="loadRecordings()">Refresh</button>
   </div>
   <div class="container">
-    <div id="recordings-container">
-      <p>Click Refresh to load recordings.</p>
-    </div>
+    <h1>Recordings</h1>
+    <div id="pagination" class="pagination"></div>
+    <div id="recordings-container"></div>
+    <div id="pagination-bottom" class="pagination"></div>
   </div>
 </body>
 </html>
