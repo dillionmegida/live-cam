@@ -1,6 +1,7 @@
 import logging  # Logging warnings/errors for streaming client disconnects, etc.
 import os  # Filesystem operations for recordings listing/serving
 import json  # Serialize responses like /system.json and /api/recordings
+import re  # Regular expressions for pattern matching
 import time  # Compute uptime from boot time
 import subprocess  # Query SoC temperature via vcgencmd on Raspberry Pi
 from datetime import datetime  # Timestamp formatting and parsing
@@ -99,34 +100,79 @@ def make_handler(output):  # Factory to bind the shared StreamingOutput to the h
                 self.wfile.write(content)
             elif self.path.startswith('/api/recordings'):
                 # Parse query parameters
-                from urllib.parse import parse_qs, urlparse
+                from urllib.parse import parse_qs, urlparse, unquote
                 query = parse_qs(urlparse(self.path).query)
                 page = int(query.get('page', ['1'])[0]) - 1  # 0-based index
+                target_date = query.get('date', [None])[0]
                 per_page = 20
                 
-                # Get all video files with their metadata
+                # Get all video files with their metadata from all date subdirectories
                 all_videos = []
-                for filename in os.listdir(RECORDINGS_DIR):
-                    if filename.endswith('.mp4'):
-                        filepath = os.path.join(RECORDINGS_DIR, filename)
-                        stat = os.stat(filepath)
-                        dt = datetime.fromtimestamp(stat.st_mtime)
-                        all_videos.append({
-                            'name': filename,
-                            'size': f"{stat.st_size / (1024*1024):.1f} MB",
-                            'date': dt.strftime('%Y-%m-%d %H:%M:%S'),
-                            'timestamp': dt.timestamp()  # For consistent sorting
-                        })
                 
-                # Sort by timestamp (newest first) and paginate
+                # If a specific date is provided, only look in that date's directory
+                if target_date:
+                    date_dir = os.path.join(RECORDINGS_DIR, target_date)
+                    if os.path.exists(date_dir) and os.path.isdir(date_dir):
+                        search_dirs = [(date_dir, target_date)]
+                    else:
+                        search_dirs = []
+                else:
+                    # If no date specified, search all directories
+                    search_dirs = [(RECORDINGS_DIR, '')]
+                    for root, dirs, _ in os.walk(RECORDINGS_DIR):
+                        for dir_name in dirs:
+                            if re.match(r'\d{4}-\d{2}-\d{2}$', dir_name):
+                                search_dirs.append((os.path.join(root, dir_name), dir_name))
+                
+                # Process each directory
+                for root, date_from_dir in search_dirs:
+                    try:
+                        files = os.listdir(root)
+                    except (OSError, IOError):
+                        continue
+                        
+                    for filename in files:
+                        if not filename.endswith('.mp4'):
+                            continue
+                            
+                        filepath = os.path.join(root, filename)
+                        if not os.path.isfile(filepath):
+                            continue
+                            
+                        try:
+                            stat = os.stat(filepath)
+                            dt = datetime.fromtimestamp(stat.st_mtime)
+                            
+                            # Use date from directory if available, otherwise from file mtime
+                            display_date = date_from_dir if date_from_dir and re.match(r'\d{4}-\d{2}-\d{2}$', date_from_dir) else dt.strftime('%Y-%m-%d')
+                            
+                            # If we're filtering by date and this file doesn't match, skip it
+                            if target_date and display_date != target_date:
+                                continue
+                            
+                            # Store relative path for download links
+                            rel_path = os.path.relpath(root, RECORDINGS_DIR)
+                            rel_filepath = os.path.join(rel_path, filename) if rel_path != '.' else filename
+                            
+                            all_videos.append({
+                                'name': filename,
+                                'path': rel_filepath,  # Relative path for downloads
+                                'size': f"{stat.st_size / (1024*1024):.1f} MB",
+                                'date': dt.strftime('%Y-%m-%d %H:%M:%S'),
+                                'date_group': display_date,
+                                'timestamp': dt.timestamp()
+                            })
+                        except (OSError, IOError):
+                            continue
+                
+                # Sort by timestamp (newest first)
                 all_videos.sort(key=lambda x: x['timestamp'], reverse=True)
-                start_idx = page * per_page
-                end_idx = start_idx + per_page
-                paginated_videos = all_videos[start_idx:end_idx]
                 
-                # Remove timestamp before sending response
+                # Clean up video objects before sending
+                paginated_videos = all_videos[page * per_page:(page + 1) * per_page]
                 for video in paginated_videos:
                     video.pop('timestamp', None)
+                    video.pop('date_group', None)
                 
                 total_videos = len(all_videos)
                 total_pages = (total_videos + per_page - 1) // per_page  # Ceiling division
@@ -145,19 +191,21 @@ def make_handler(output):  # Factory to bind the shared StreamingOutput to the h
                 self.send_header('Cache-Control', 'no-cache')
                 self.end_headers()
                 self.wfile.write(content)
-            elif self.path.startswith('/download/'):
+            elif self.path.startswith('/download'):
                 # Serve video file for download/inline playback
-                filename = self.path[len('/download/'):]  # Extract filename from path
-                filename = filename.split('?')[0]  # Remove any query parameters
-                filepath = os.path.join(RECORDINGS_DIR, filename)  # Build absolute path
+                rel_path = self.path[len('/download/'):]  # Extract relative path from URL
+                rel_path = rel_path.split('?')[0]  # Remove any query parameters
+                rel_path = rel_path.replace('..', '')  # Prevent directory traversal
+                filepath = os.path.join(RECORDINGS_DIR, rel_path)  # Build absolute path
                 
-                if os.path.exists(filepath) and filepath.startswith(RECORDINGS_DIR):
+                # Check if file exists and is within the RECORDINGS_DIR
+                if os.path.exists(filepath) and os.path.abspath(filepath).startswith(os.path.abspath(RECORDINGS_DIR)):
                     # Get file size and send headers for streaming
                     file_size = os.path.getsize(filepath)
                     self.send_response(200)
                     self.send_header('Content-Type', 'video/mp4')
                     self.send_header('Content-Length', file_size)
-                    self.send_header('Content-Disposition', f'inline; filename="{filename}"')
+                    self.send_header('Content-Disposition', f'inline; filename="{os.path.basename(rel_path)}"')
                     self.end_headers()
                     
                     # Stream the file in 1MB chunks

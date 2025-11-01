@@ -222,11 +222,32 @@ PAGE_RECORDINGS = """
       window.scrollTo(0, 0);
     }
 
+    function getCurrentDate() {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function setupDatePicker() {
+      const datePicker = document.getElementById('date-picker');
+      const today = getCurrentDate();
+      datePicker.value = today;
+      datePicker.max = today;  // Don't allow future dates
+      
+      datePicker.addEventListener('change', () => {
+        currentPage = 1;  // Reset to first page when changing date
+        loadRecordings();
+      });
+    }
+
     function loadRecordings() {
       const container = document.getElementById('recordings-container');
+      const date = document.getElementById('date-picker').value;
       container.innerHTML = '<p>Loading recordings...</p>';
       
-      fetch(`/api/recordings?page=${currentPage}`)
+      fetch(`/api/recordings?page=${currentPage}&date=${date}`)
         .then(response => response.json())
         .then(data => {
           container.innerHTML = '';
@@ -245,9 +266,9 @@ PAGE_RECORDINGS = """
                 <p><strong>Date:</strong> ${video.date}</p>
                 <p><strong>Size:</strong> ${video.size}</p>
               </div>
-              <a href="/download/${encodeURIComponent(video.name)}" class="download-btn">Download</a>
+              <a href="/download/${video.path}" class="download-btn">Download</a>
               <video class="preview" controls>
-                <source src="/download/${encodeURIComponent(video.name)}" type="video/mp4">
+                <source src="/download/${video.path}" type="video/mp4">
                 Your browser does not support the video tag.
               </video>
             `;
@@ -267,7 +288,10 @@ PAGE_RECORDINGS = """
         });
     }
     
-    window.onload = loadRecordings;
+    window.onload = () => {
+      setupDatePicker();
+      loadRecordings();
+    };
   </script>
   <style>
     * { margin:0; padding:0; }
@@ -361,6 +385,25 @@ PAGE_RECORDINGS = """
       font-weight: bold;
     }
 
+    .date-filter {
+      margin: 15px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .date-filter label {
+      font-weight: bold;
+      color: #333;
+    }
+
+    .date-filter input[type="date"] {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
     .video-item {
       background: white;
       border-radius: 8px;
@@ -414,6 +457,10 @@ PAGE_RECORDINGS = """
 <body>
   <div class="header">
     <h1>Video Recordings</h1>
+    <div class="date-filter">
+      <label for="date-picker">Filter by Date:</label>
+      <input type="date" id="date-picker">
+    </div>
     <a href="/" class="back-link">← Back to Live Feed</a>
     <button class="refresh-btn" onclick="loadRecordings()">Refresh</button>
   </div>

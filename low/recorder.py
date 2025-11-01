@@ -35,9 +35,14 @@ class VideoRecorder:
                 self.recording = False
                 break
 
-            # Build timestamped filename per segment
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_file = os.path.join(self.output_dir, f'recording_{timestamp}.mp4')
+            # Get current timestamp and create date-based directory
+            now = datetime.now()
+            date_dir = os.path.join(self.output_dir, now.strftime('%Y-%m-%d'))
+            os.makedirs(date_dir, exist_ok=True)  # Ensure date directory exists
+            
+            # Build timestamped filename in date directory
+            timestamp = now.strftime('%Y%m%d_%H%M%S')
+            output_file = os.path.join(date_dir, f'recording_{timestamp}.mp4')
 
             # Configure encoder and file output
             encoder = H264Encoder()
