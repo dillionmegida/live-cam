@@ -233,8 +233,29 @@ PAGE_RECORDINGS = """
     function setupDatePicker() {
       const datePicker = document.getElementById('date-picker');
       const today = getCurrentDate();
+      
+      // Set default and max date (today)
       datePicker.value = today;
-      datePicker.max = today;  // Don't allow future dates
+      datePicker.max = today;
+      
+      // Fetch the oldest recording date and set it as min date
+      fetch('/api/oldest-date')
+        .then(response => response.json())
+        .then(data => {
+          if (data.oldest_date) {
+            datePicker.min = data.oldest_date;
+            // If current date is before the oldest date, update it
+            if (new Date(datePicker.value) < new Date(data.oldest_date)) {
+              datePicker.value = data.oldest_date;
+            }
+          } else {
+            // If no recordings, disable the date picker
+            datePicker.disabled = true;
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching oldest date:', err);
+        });
       
       datePicker.addEventListener('change', () => {
         currentPage = 1;  // Reset to first page when changing date

@@ -191,6 +191,31 @@ def make_handler(output):  # Factory to bind the shared StreamingOutput to the h
                 self.send_header('Cache-Control', 'no-cache')
                 self.end_headers()
                 self.wfile.write(content)
+            elif self.path == '/api/oldest-date':
+                # Find the oldest recording date
+                oldest_date = None
+                
+                try:
+                    for entry in os.scandir(RECORDINGS_DIR):
+                        if entry.is_dir() and re.match(r'\d{4}-\d{2}-\d{2}$', entry.name):
+                            try:
+                                dir_date = datetime.strptime(entry.name, '%Y-%m-%d').date()
+                                if oldest_date is None or dir_date < oldest_date:
+                                    oldest_date = dir_date
+                            except ValueError:
+                                continue
+                    
+                    response = {
+                        'oldest_date': oldest_date.isoformat() if oldest_date else None
+                    }
+                    content = json.dumps(response).encode('utf-8')
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(content)
+                except Exception as e:
+                    self.send_error(500, str(e))
+                    
             elif self.path.startswith('/download'):
                 # Serve video file for download/inline playback
                 rel_path = self.path[len('/download/'):]  # Extract relative path from URL
