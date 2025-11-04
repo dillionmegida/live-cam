@@ -32,7 +32,8 @@ def delete_old_recordings(days_to_keep=7):
         return
     
     # Get all date-named directories
-    deleted_count = 0
+    deleted_dirs = 0
+    deleted_videos = 0
     total_freed = 0  # in bytes
     
     for entry in os.scandir(RECORDINGS_DIR):
@@ -52,10 +53,16 @@ def delete_old_recordings(days_to_keep=7):
                 dir_size = sum(f.stat().st_size for f in Path(entry.path).rglob('*') if f.is_file())
                 
                 # Remove the directory and all its contents
-                shutil.rmtree(entry.path)
-                print(f"Deleted {entry.path} (size: {dir_size / (1024*1024):.2f} MB)")
+                # Count video files before deletion
+                video_extensions = ('.mp4', '.avi', '.mov', '.mkv')
+                video_count = sum(1 for f in Path(entry.path).rglob('*') 
+                               if f.is_file() and f.suffix.lower() in video_extensions)
                 
-                deleted_count += 1
+                shutil.rmtree(entry.path)
+                print(f"Deleted {entry.path} (size: {dir_size / (1024*1024):.2f} MB, {video_count} videos)")
+                
+                deleted_dirs += 1
+                deleted_videos += video_count
                 total_freed += dir_size
                 
             except Exception as e:
@@ -63,9 +70,9 @@ def delete_old_recordings(days_to_keep=7):
     
     # Print summary
     print(f"\nCleanup complete!")
-    print(f"Deleted {deleted_count} directories")
+    print(f"Deleted {deleted_dirs} directories")
+    print(f"Deleted {deleted_videos} video files")
     print(f"Freed {total_freed / (1024*1024):.2f} MB of disk space")
 
 if __name__ == "__main__":
-    # Default to keeping 5 days of recordings
     delete_old_recordings(days_to_keep=7)
